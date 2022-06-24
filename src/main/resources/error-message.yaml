@@ -1,0 +1,6 @@
+errorMessages:
+  FIELD_BLANK:
+    FIRST_NAME: "First name value is missing"
+    EMAIL: "Email field is blank" 
+    DOB:  "DOB field is blank"
+    PASSWORD: "Password is mandatory"    

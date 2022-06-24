@@ -1,5 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd"></mule>
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<configuration-properties doc:name="Configuration properties" doc:id="6df260a2-11c5-4810-a30a-75cb18f0f761" file="general-config.yaml" doc:description="General config"/>
+	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="1c0bc7b7-7c08-4697-8af2-21e11424be1f" file="secure-config.yaml" key="user_module" doc:description="Secure Config">
+		<secure-properties:encrypt algorithm="Blowfish" />
+	</secure-properties:config>
+	<db:config name="MYSQL_Database_Config" doc:name="Database Config" doc:id="f0046886-e518-4950-9888-042685ae189c" >
+		<db:my-sql-connection host="${database.host}" port="${database.port}" user="${database.user}" password="${database.password}" database="${database.databasename}" />
+	</db:config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="94a80673-37bd-47dc-b7bc-bb95de0fde29" >
+		<http:listener-connection host="${http.host}" port="${http.port}" />
+	</http:listener-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="df63ee54-d804-46a4-864a-f3e85bfdd150" file="error-message.yaml" doc:description="Error message"/>
+	<flow name="mule-database-system-apiFlow" doc:id="50cb2a95-411a-4ecc-8a68-7c17a523915e" >
+		<http:listener doc:name="Listener" doc:id="132989f2-4aed-497f-a26b-6c134364bcc0" config-ref="HTTP_Listener_config" path="/test"/>
+		<db:select doc:name="Select" doc:id="c5b5429f-9fca-46ca-892b-c1301da636a8" config-ref="MYSQL_Database_Config">
+			<db:sql ><![CDATA[SELECT * FROM users;]]></db:sql>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="10186009-9ba3-4c4a-8d00-41cb9df4c530" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>

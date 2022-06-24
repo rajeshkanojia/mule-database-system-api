@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="create-user-table-flow" doc:id="16e4abbd-4c59-4b2b-9478-45f5fef96935" >
+		<http:listener doc:name="Listener" doc:id="d6f9a56b-8e06-43e7-915d-c9c4acced2cc" config-ref="HTTP_Listener_config" path="/setup"/>
+		<try doc:name="Try" doc:id="f4b1a376-447a-4099-984a-2bc9adb247a0" >
+			<db:execute-ddl doc:name="Create Users table." doc:id="072c2838-5e05-4e84-a06f-33afd3376c86" config-ref="MYSQL_Database_Config">
+			<db:sql><![CDATA[#[
+%dw 2.0
+output text/plain
+---
+readUrl("classpath://sql/create-user-table.sql", "text/plain")
+
+
+]
+]]></db:sql>
+		</db:execute-ddl>
+			<error-handler >
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="7af2cf76-5caf-4197-855a-4b002928c68f" type="DB:BAD_SQL_SYNTAX, DB:QUERY_EXECUTION">
+					<ee:transform doc:name="Transform Message" doc:id="ebe3f632-d734-42ab-9260-3a983075d1fe" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	msg : "continue error",
+	error : error,
+	payload : payload
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<logger level="INFO" doc:name="Logger" doc:id="da1274e9-14ac-433a-8902-2b6dd22006d2" message="#[payload]"/>
+				</on-error-continue>
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="c8a5deb1-7f6a-456e-b4ce-9f521e774fda" type="DB:CONNECTIVITY, DB:RETRY_EXHAUSTED">
+					<ee:transform doc:name="Transform Message" doc:id="96a3850b-ba76-45c9-96e0-fd9ec9f6e5e9" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	msg : "propogate error",
+	error : error,
+	payload : payload
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<logger level="INFO" doc:name="Logger" doc:id="577bea9d-e9a5-487d-9519-9ac213081afa" message="#[payload]"/>
+				</on-error-propagate>
+			</error-handler>
+		</try>
+		<ee:transform doc:name="Transform Message" doc:id="ea6ddb94-bed7-45cf-9e6d-26f4f2d2e717" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="drop-user-table-flow" doc:id="7024b06f-6b3b-45f2-aff4-c7386f351d1e" >
+		<http:listener doc:name="Listener" doc:id="00734330-0f81-4a88-b12a-8bcb4d4014fe" config-ref="HTTP_Listener_config" path="/drop"/>
+		<db:execute-ddl doc:name="Execute DDL" doc:id="e54d347a-dcdc-435b-9b95-8e463963ef0b" config-ref="MYSQL_Database_Config">
+			<db:sql ><![CDATA[#[
+%dw 2.0
+output text/plain
+---
+readUrl("classpath://sql/drop-user-table.sql", "text/plain")
+
+]]]></db:sql>
+		</db:execute-ddl>
+		<ee:transform doc:name="Transform Message" doc:id="4a0e76d4-f70d-4a76-a49d-fd856231bf08" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>

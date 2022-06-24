@@ -1,0 +1,7 @@
+{
+    "first_name" :  "first name",
+    "last_name" :  "last name",
+    "email" :  "user@email.com",
+    "date_of_birth" : "YYYY-MM-DD",
+    "password" : "password"
+}

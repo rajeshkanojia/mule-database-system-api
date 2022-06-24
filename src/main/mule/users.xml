@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<flow name="users-GET-Flow" doc:id="d4ff4c6d-f1a1-43cd-a86b-b7ac8dd54d76" >
+		<http:listener doc:name="Listener" doc:id="39cf1d39-131c-4f7e-b803-be0e2271bd4f" config-ref="HTTP_Listener_config" allowedMethods="GET" path="/users"/>
+		<ee:transform doc:name="Transform Message" doc:id="2d902e14-45ad-448c-a6e9-7a5623199a15" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="users-POST-Flow" doc:id="e58cb4dd-4eed-4501-9666-39d075825c53" >
+		<http:listener doc:name="Listener" doc:id="adc77639-e0b1-4310-a070-25c3192d5a8f" config-ref="HTTP_Listener_config" allowedMethods="POST" path="/users"/>
+		<ee:transform doc:name="Transform Message" doc:id="2c405508-fd63-401f-b8a9-c262ab8c8d47" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<choice doc:name="Choice" doc:id="c6824f92-629b-4f4d-af7b-1dc6e53c12e9" >
+			<when expression="#[isBlank(payload.first_name)]">
+				<raise-error doc:name="First name is Blank" doc:id="61703c04-675f-43c8-8b31-ab3a074b7805" type="APP:FIELD_BLANK" description="#[p('errorMessages.FIELD_BLANK.FIRST_NAME')]"/>
+			</when>
+			<when expression="#[isBlank(payload.email)]">
+				<raise-error doc:name="Email is Blank" doc:id="618f5745-3e0b-4395-b9f5-93e215a8d46f" type="APP:FIELD_BLANK" description="#[p('errorMessages.FIELD_BLANK.EMAIL')]"/>
+			</when>
+			<when expression="#[isBlank(payload.date_of_birth)]">
+				<raise-error doc:name="DOB is Blank" doc:id="b4c37c01-c792-4a4e-97b4-23d785803d0e" type="APP:FIELD_BLANK" description="#[p('errorMessages.FIELD_BLANK.DOB')]"/>
+			</when>
+			<when expression="#[isBlank(payload.password)]">
+				<raise-error doc:name="Password is Blank" doc:id="571372c8-5e7c-45b7-9999-89202b4f7772" type="APP:FIELD_BLANK" description="#[p('errorMessages.FIELD_BLANK.PASSWORD')]"/>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="14f4c14c-a9fd-4ae3-82bb-e20be7c98ec4" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload ++ {"msg" : "hello"}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+		<ee:transform doc:name="Transform Message" doc:id="11d43900-92d4-442d-b27e-f34a8ca3e8b7">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	msg : "trans",
+	payload : payload
+}
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="5d3c94c7-0451-4043-8346-959ba303f5b8" type="APP:*">
+				<ee:transform doc:name="Transform Message" doc:id="81ca5061-b10b-4666-8f1d-8e90aaa9aea1" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"[" ++ now() ++ "] - " ++ error.errorType.namespace as String ++ ":" ++ error.errorType.identifier as String ++ " - " ++ error.description as String
+/* 
+error update{
+    	case description at .description if(isBlank(error.description)) -> "description"
+}
+* 
+*/
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="3ac1efe4-7d43-4d63-9cfe-171577fa3631" message='#[payload]'/>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>

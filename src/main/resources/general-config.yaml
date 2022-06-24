@@ -1,0 +1,9 @@
+http:
+  host : "localhost"
+  port : "8081"
+database:
+  host: "db4free.net"
+  port: "3306"
+  user: "user_module"
+  password: "*diu2PTF7hArwu5"
+  databasename: "user_module"
