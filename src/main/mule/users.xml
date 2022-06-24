@@ -1,15 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
-	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
-	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
 http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
-http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
 	<validation:config name="Validation_Config" doc:name="Validation Config" doc:id="a14442ff-bac3-4ddf-ab6e-7faac1f05454" />
+	<file:config name="File_Config" doc:name="File Config" doc:id="2c458599-334f-4fc7-bc9c-a694527a449e" >
+		<file:connection workingDir="C:\Users\Rajesh\AnypointStudio\studio-workspace\mule-database-system-api\src" />
+	</file:config>
 	<flow name="users-GET-Flow" doc:id="d4ff4c6d-f1a1-43cd-a86b-b7ac8dd54d76" >
 		<http:listener doc:name="Listener" doc:id="39cf1d39-131c-4f7e-b803-be0e2271bd4f" config-ref="HTTP_Listener_config" allowedMethods="GET" path="/users"/>
+		<db:select doc:name="Select" doc:id="ccd302aa-9778-467e-bfd9-a71b4a089904" config-ref="MYSQL_Database_Config">
+			<db:sql ><![CDATA[SELECT * FROM users;]]></db:sql>
+		</db:select>
 		<ee:transform doc:name="Transform Message" doc:id="2d902e14-45ad-448c-a6e9-7a5623199a15" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
@@ -105,5 +112,94 @@ error update{
 				<logger level="INFO" doc:name="Logger" doc:id="3ac1efe4-7d43-4d63-9cfe-171577fa3631" message='#[payload]'/>
 			</on-error-propagate>
 		</error-handler>
+	</flow>
+	<flow name="users-DELETE-by-ID-Flow" doc:id="d84caaca-9783-46bb-9b1b-e53e19c3f15c" >
+		<http:listener doc:name="Listener" doc:id="7fa530f9-8cc3-45cc-8508-68d1a613609b" config-ref="HTTP_Listener_config" allowedMethods="DELETE" path="/users/{id}"/>
+		<set-payload value="#[attributes.uriParams.id]" doc:name="Set Payload" doc:id="f2924cce-998f-48b1-94c9-f6f54e700cc2" />
+		<db:delete doc:name="Delete single user by id" doc:id="792bfd76-c828-4bac-ae96-5b1104a07d36" config-ref="MYSQL_Database_Config" target="userDeleteStatus">
+			<db:sql ><![CDATA[#[
+%dw 2.0
+output text/plain
+---
+readUrl("classpath://sql/query-to-delete-single-user.sql", "text/plain")
+
+]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{'id' : payload}]]]></db:input-parameters>
+		</db:delete>
+		<ee:transform doc:name="Transform Message" doc:id="52d5f3b7-365a-4d4b-af3f-c72cf7125874" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+if(vars.userDeleteStatus ~= 1) {msg : "user deleted successfully"}else{msg: "we don't have any user with this id."}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="users-DELETE-Conditional-Flow" doc:id="cfa5cdc9-04b3-410b-8154-4949ffb5a54e" >
+		<http:listener doc:name="Listener" doc:id="fbe73eaa-5ed1-44f0-a0d6-f4d3b14d38b9" config-ref="HTTP_Listener_config" allowedMethods="DELETE" path="/users"/>
+		<ee:transform doc:name="Transform Message" doc:id="0b0d355d-9cce-469d-9ec3-79acba171465" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<db:delete doc:name="Delete" doc:id="0708cf45-6040-44e4-97bc-d2e58a6336a3" config-ref="MYSQL_Database_Config">
+			<db:sql ><![CDATA[DELETE FROM users WHERE first_name = :first_name;]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{'first_name' : payload.first_name }]]]></db:input-parameters>
+		</db:delete>
+	</flow>
+	<flow name="usersFlow" doc:id="472a9b6a-4a19-477e-ae00-da6b3be6dc48" >
+		<http:listener doc:name="Listener" doc:id="1b64676f-6d04-4463-80b1-f4bf3783da80" config-ref="HTTP_Listener_config" path="/users" allowedMethods="PUT"/>
+		<ee:transform doc:name="Transform Message" doc:id="6ea36bc8-0e73-49bc-8019-5ef933d02db3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload.id]" doc:name="key" doc:id="fca2bf11-a41a-403d-96ed-c03091acd980" variableName="key"/>
+		<validation:is-not-blank-string doc:name="key should not be blank" doc:id="28e44b41-5711-4c86-bbb3-a2488f66638d" config-ref="Validation_Config" value="#[vars.key]" message="#[p('errorMessages.FIELD_BLANK.KEY_NEEDED')]" />
+		<set-payload value="#[payload.fields]" doc:name="Set Payload" doc:id="6cf46c23-1c91-45cf-8ae9-60cafd03789b" />
+		<choice doc:name="Choice" doc:id="f2ecef0f-b9e1-4463-b051-5ab44fe4b24c" >
+			<when expression='#[!isBlank(payload.email)]'>
+				<raise-error doc:name="Email Update Not Allowed" doc:id="8d83141f-0acd-48c1-b198-f1867e7eb429" type="APP:NOT_ALLOWED" description="#[p('errorMessages.NOT_ALLOWED.EMAIL_UPDATE')]"/>
+			</when>
+			<when expression="#[isEmpty(payload)]">
+				<raise-error doc:name="Update fields missing" doc:id="8be5f664-1886-4ea7-85c5-ba86a9e5824f" type="APP:FIELD_BLANK" description="#[p('errorMessages.FIELD_BLANK.UPDATE_FIELDS_MISSING')]"/>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="21951d3d-6f52-481f-a344-e78499c79c6d" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+		<ee:transform doc:name="prepare payload to update user record" doc:id="e11c16c7-336f-4ce9-95ae-e8689eb025da" >
+			<ee:message >
+				<ee:set-payload resource="dwl/payload-to-update-user-record.dwl" />
+			</ee:message>
+		</ee:transform>
+		<set-variable value='#[%dw 2.0&#10;output application/json&#10;---&#10;payload update {&#10;    case first_name at .first_name if(!isEmpty(first_name)) -&gt; "first_name = :first_name,"&#10;    case password at .password if(!isEmpty(password)) -&gt; "password = :password,"&#10;    case last_name at .last_name if(!isEmpty(last_name)) -&gt; "last_name = :last_name,"&#10;	case date_of_birth at .date_of_birth if(!isEmpty(date_of_birth)) -&gt; "date_of_birth = :date_of_birth,"&#10;	case account_status at .account_status if(!isEmpty(account_status)) -&gt; "account_status = :account_status,"&#10;	case email_verification_status at .email_verification_status if(!isEmpty(email_verification_status)) -&gt; "email_verification_status = :email_verification_status,"	&#10;} ++ { id : ":id" }pluck $]' doc:name="prepareQueryParameters" doc:id="f068d6b8-e3a9-4dbe-aae4-3e9c3a9b0e89" variableName="prepareQueryParameters"/>
+		<set-variable value='#[%dw 2.0&#10;import * from dw::core::Strings&#10;output application/json&#10;---&#10;"UPDATE users SET " ++ substringBeforeLast(vars.prepareQueryParameters joinBy " ", ",") ++ " WHERE id = :id;"]' doc:name="Prepare update query" doc:id="635117d5-84d8-451e-8391-e3a0c90470a1" variableName="prepareUpdateQuery"/>
+		<db:update doc:name="Update the record" doc:id="bc22021c-fd72-4a6a-b174-42adfc208e87" config-ref="MYSQL_Database_Config">
+			<db:sql ><![CDATA[#[vars.prepareUpdateQuery]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[payload]]]></db:input-parameters>
+		</db:update>
+		<ee:transform doc:name="prepare update query" doc:id="84de1cc6-95a7-4814-84b2-e052f7dab6dd">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+import * from dw::core::Strings
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
 	</flow>
 </mule>

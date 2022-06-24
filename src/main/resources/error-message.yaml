@@ -4,5 +4,9 @@ errorMessages:
     EMAIL: "Email field is blank" 
     DOB:  "DOB field is blank"
     PASSWORD: "Password is mandatory"
+    KEY_NEEDED : "Key parameter is missing"
+    UPDATE_FIELDS_MISSING: "Update fields are missing."
   INVALID:
-    DATE_FORMAT: "Date format is wrong."  
+    DATE_FORMAT: "Date format is wrong."
+  NOT_ALLOWED: 
+    EMAIL_UPDATE: "You can't update you email.'"  
