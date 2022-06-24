@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
-	xmlns:http="http://www.mulesoft.org/schema/mule/http"
-	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
-http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<validation:config name="Validation_Config" doc:name="Validation Config" doc:id="a14442ff-bac3-4ddf-ab6e-7faac1f05454" />
 	<flow name="users-GET-Flow" doc:id="d4ff4c6d-f1a1-43cd-a86b-b7ac8dd54d76" >
 		<http:listener doc:name="Listener" doc:id="39cf1d39-131c-4f7e-b803-be0e2271bd4f" config-ref="HTTP_Listener_config" allowedMethods="GET" path="/users"/>
 		<ee:transform doc:name="Transform Message" doc:id="2d902e14-45ad-448c-a6e9-7a5623199a15" >
@@ -41,28 +43,48 @@ payload]]></ee:set-payload>
 				<raise-error doc:name="Password is Blank" doc:id="571372c8-5e7c-45b7-9999-89202b4f7772" type="APP:FIELD_BLANK" description="#[p('errorMessages.FIELD_BLANK.PASSWORD')]"/>
 			</when>
 			<otherwise >
-				<ee:transform doc:name="Transform Message" doc:id="14f4c14c-a9fd-4ae3-82bb-e20be7c98ec4" >
+				<ee:transform doc:name="Add extra fields" doc:id="14f4c14c-a9fd-4ae3-82bb-e20be7c98ec4" >
 					<ee:message >
-						<ee:set-payload ><![CDATA[%dw 2.0
-output application/json
----
-payload ++ {"msg" : "hello"}]]></ee:set-payload>
+						<ee:set-payload resource="dwl/add-other-mandatory-fields-for-user-table.dwl" />
 					</ee:message>
 				</ee:transform>
 			</otherwise>
 		</choice>
-		<ee:transform doc:name="Transform Message" doc:id="11d43900-92d4-442d-b27e-f34a8ca3e8b7">
-					<ee:message>
-						<ee:set-payload><![CDATA[%dw 2.0
+		<ee:transform doc:name="prepare payload for DB" doc:id="2ad19ae9-80dd-44b5-92f0-d7e1c9c0c28a" >
+			<ee:message >
+				<ee:set-payload resource="dwl/final-payload-for-user-table.dwl" />
+			</ee:message>
+		</ee:transform>
+		<db:insert doc:name="Insert record in User table" doc:id="3a5a9338-ed08-4f69-80f8-b2a2c741bcf8" config-ref="MYSQL_Database_Config" autoGenerateKeys="true">
+			<db:sql ><![CDATA[#[
+%dw 2.0
+output text/plain
+---
+readUrl("classpath://sql/query-to-insert-record-in-user-table.sql", "text/plain")
+]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	'first_name' : payload.first_name, 
+	'last_name' : payload.last_name, 
+	'email' : payload.email, 
+	'password' : payload.password, 
+	'date_of_birth' : payload.date_of_birth, 
+	'date_of_joining' : payload.date_of_joining, 
+	'account_status' : payload.account_status,	
+	'email_verification_status' : payload.email_verification_status
+}]]]></db:input-parameters>
+			<db:auto-generated-keys-column-names >
+				<db:auto-generated-keys-column-name value="id" />
+				<db:auto-generated-keys-column-name value="name" />
+			</db:auto-generated-keys-column-names>
+		</db:insert>
+		<ee:transform doc:name="Transform Message" doc:id="6053c70b-8dd9-4a33-b69c-84ffd99ee34c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
 output application/json
 ---
-{
-	msg : "trans",
-	payload : payload
-}
-]]></ee:set-payload>
-					</ee:message>
-				</ee:transform>
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
 		<error-handler >
 			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="5d3c94c7-0451-4043-8346-959ba303f5b8" type="APP:*">
 				<ee:transform doc:name="Transform Message" doc:id="81ca5061-b10b-4666-8f1d-8e90aaa9aea1" >

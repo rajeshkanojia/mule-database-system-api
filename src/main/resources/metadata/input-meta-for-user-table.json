@@ -1,0 +1,10 @@
+{
+    "first_name": "Rajesh",
+    "last_name": "kanojia",
+    "email": "rajesh@yopmail.com",
+    "date_of_birth": "1988-05-22",
+    "password": "hash_password",
+    "date_of_joining": "2022-06-24",
+    "account_status": "inactive",
+    "email_verification_status": "unverified"
+}

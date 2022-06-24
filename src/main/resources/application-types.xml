@@ -14,12 +14,37 @@ type create_user_record_input_meta = {|
 
 ]]></types:shape>
     </types:type>
+    <types:type name="input-meta-for-user-table" format="json">
+      <types:shape format="weave" example="metadata/input-meta-for-user-table.json"><![CDATA[%dw 2.0
+
+type input_meta_for_user_table = {|
+  first_name: String, 
+  last_name: String, 
+  email: String, 
+  date_of_birth: String, 
+  password: String, 
+  date_of_joining: String, 
+  account_status: String, 
+  email_verification_status: String
+|} {"example": "{\\\"first_name\\\":\\\"Rajesh\\\",\\\"last_name\\\":\\\"kanojia\\\",\\\"email\\\":\\\"rajesh@yopmail.com\\\",\\\"date_of_birth\\\":\\\"1988-05-22\\\",\\\"password\\\":\\\"hash_password\\\",\\\"date_of_joining\\\":\\\"2022-06-24\\\",\\\"account_status\\\":\\\"inactive\\\",\\\"email_verification_status\\\":\\\"unverified\\\"}"}
+
+]]></types:shape>
+    </types:type>
   </types:catalog>
   <types:enrichment select="#2c405508-fd63-401f-b8a9-c262ab8c8d47">
     <types:processor-declaration>
       <types:input-event>
         <types:message>
           <types:payload type="create-user-record-input-meta"/>
+        </types:message>
+      </types:input-event>
+    </types:processor-declaration>
+  </types:enrichment>
+  <types:enrichment select="#2ad19ae9-80dd-44b5-92f0-d7e1c9c0c28a">
+    <types:processor-declaration>
+      <types:input-event>
+        <types:message>
+          <types:payload type="input-meta-for-user-table"/>
         </types:message>
       </types:input-event>
     </types:processor-declaration>
