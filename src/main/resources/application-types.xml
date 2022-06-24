@@ -49,4 +49,5 @@ type input_meta_for_user_table = {|
       </types:input-event>
     </types:processor-declaration>
   </types:enrichment>
+  <types:enrichment select="#3403fb3f-3a6b-4bd3-8710-37a9e7384bdd"/>
 </types:mule>

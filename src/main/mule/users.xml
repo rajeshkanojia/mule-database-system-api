@@ -181,13 +181,21 @@ payload]]></ee:set-payload>
 				</ee:transform>
 			</otherwise>
 		</choice>
-		<ee:transform doc:name="prepare payload to update user record" doc:id="e11c16c7-336f-4ce9-95ae-e8689eb025da" >
+		<ee:transform doc:name="prepare payload to update user record + vars.prepareQueryParameters" doc:id="e11c16c7-336f-4ce9-95ae-e8689eb025da" >
 			<ee:message >
 				<ee:set-payload resource="dwl/payload-to-update-user-record.dwl" />
 			</ee:message>
+			<ee:variables >
+				<ee:set-variable resource="dwl/prepare-Query-Parameters-to-update-user-record.dwl" variableName="prepareQueryParameters" />
+			</ee:variables>
 		</ee:transform>
-		<set-variable value='#[%dw 2.0&#10;output application/json&#10;---&#10;payload update {&#10;    case first_name at .first_name if(!isEmpty(first_name)) -&gt; "first_name = :first_name,"&#10;    case password at .password if(!isEmpty(password)) -&gt; "password = :password,"&#10;    case last_name at .last_name if(!isEmpty(last_name)) -&gt; "last_name = :last_name,"&#10;	case date_of_birth at .date_of_birth if(!isEmpty(date_of_birth)) -&gt; "date_of_birth = :date_of_birth,"&#10;	case account_status at .account_status if(!isEmpty(account_status)) -&gt; "account_status = :account_status,"&#10;	case email_verification_status at .email_verification_status if(!isEmpty(email_verification_status)) -&gt; "email_verification_status = :email_verification_status,"	&#10;} ++ { id : ":id" }pluck $]' doc:name="prepareQueryParameters" doc:id="f068d6b8-e3a9-4dbe-aae4-3e9c3a9b0e89" variableName="prepareQueryParameters"/>
-		<set-variable value='#[%dw 2.0&#10;import * from dw::core::Strings&#10;output application/json&#10;---&#10;"UPDATE users SET " ++ substringBeforeLast(vars.prepareQueryParameters joinBy " ", ",") ++ " WHERE id = :id;"]' doc:name="Prepare update query" doc:id="635117d5-84d8-451e-8391-e3a0c90470a1" variableName="prepareUpdateQuery"/>
+		<ee:transform doc:name="vars.prepareUpdateQuery" doc:id="3403fb3f-3a6b-4bd3-8710-37a9e7384bdd" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable resource="dwl/prepare-Update-Query.dwl" variableName="prepareUpdateQuery" />
+			</ee:variables>
+		</ee:transform>
 		<db:update doc:name="Update the record" doc:id="bc22021c-fd72-4a6a-b174-42adfc208e87" config-ref="MYSQL_Database_Config">
 			<db:sql ><![CDATA[#[vars.prepareUpdateQuery]]]></db:sql>
 			<db:input-parameters ><![CDATA[#[payload]]]></db:input-parameters>
