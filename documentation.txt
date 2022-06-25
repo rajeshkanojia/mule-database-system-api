@@ -3,6 +3,8 @@ Developer name : Rajesh Kumar Kanojia
 
 
 
+
+
 Users table schema:- 
 	CREATE TABLE users(
 	    id  INT NOT NULL AUTO_INCREMENT

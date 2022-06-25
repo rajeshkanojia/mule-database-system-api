@@ -1,1 +1,1 @@
-DELETE FROM users WHERE id = :id;
+DELETE FROM users WHERE hashID = :id;

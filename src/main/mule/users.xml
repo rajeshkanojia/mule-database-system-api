@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:db="http://www.mulesoft.org/schema/mule/db"
-	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
-	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
 http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
 http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
-http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
 	<validation:config name="Validation_Config" doc:name="Validation Config" doc:id="a14442ff-bac3-4ddf-ab6e-7faac1f05454" />
 	<file:config name="File_Config" doc:name="File Config" doc:id="2c458599-334f-4fc7-bc9c-a694527a449e" >
 		<file:connection workingDir="C:\Users\Rajesh\AnypointStudio\studio-workspace\mule-database-system-api\src" />
@@ -20,18 +21,7 @@ http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/fil
 			<when expression="#[!isEmpty(vars.queryParameters)]">
 				<ee:transform doc:name="payload + vars.prepareQueryParametersToFetchUserRecords" doc:id="2d902e14-45ad-448c-a6e9-7a5623199a15">
 			<ee:message>
-				<ee:set-payload><![CDATA[%dw 2.0
-output application/json
----
-vars.queryParameters update{
-	case first_name at .first_name if(!isEmpty(first_name)) -> lower(first_name)
-	case last_name at .last_name if(!isEmpty(last_name)) -> lower(last_name)
-	case email at .email if(!isEmpty(email)) -> lower(email)
-	case account_status at .account_status if(!isEmpty(account_status)) -> lower(account_status)
-	case email_verification_status at .email_verification_status if(!isEmpty(email_verification_status)) -> lower(email_verification_status)
-	case id at .id if(!isEmpty(id)) -> id
-	case key at .key if(!isEmpty(key)) -> key
-}]]></ee:set-payload>
+						<ee:set-payload resource="dwl/payload-to-fetch-user-record-through-query-parameters.dwl" />
 			</ee:message>
 			<ee:variables>
 				<ee:set-variable resource="dwl/prepare-query-parameters-to-fetch-user-records.dwl" variableName="prepareQueryParametersToFetchUserRecords" />
@@ -138,21 +128,40 @@ payload]]></ee:set-payload>
 				<raise-error doc:name="Password is Blank" doc:id="571372c8-5e7c-45b7-9999-89202b4f7772" type="APP:FIELD_BLANK" description="#[p('errorMessages.FIELD_BLANK.PASSWORD')]"/>
 			</when>
 			<otherwise >
-				<ee:transform doc:name="Add extra fields" doc:id="14f4c14c-a9fd-4ae3-82bb-e20be7c98ec4" >
-					<ee:message >
-						<ee:set-payload resource="dwl/add-other-mandatory-fields-for-user-table.dwl" />
-					</ee:message>
-				</ee:transform>
+				<try doc:name="Try" doc:id="b64d6332-70a7-437d-ac36-f9180900fe5c" >
+					<idempotent-message-validator doc:name="Check if email already exists" doc:id="12138556-97da-48e2-a96f-b5fd3a33c293" idExpression="#[payload.email]">
+					<os:private-object-store alias="user_record_duplicacy" />
+				</idempotent-message-validator>
+					<error-handler >
+						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="8f6c20f9-9dbc-4d3f-854c-d2e26430a6ff" type="ANY">
+							<set-payload value="#[{}]" doc:name="Set Payload" doc:id="94917048-caa5-40a1-aa88-b542b07c587a" />
+						</on-error-continue>
+					</error-handler>
+				</try>
 			</otherwise>
 		</choice>
-		<ee:transform doc:name="prepare payload for DB" doc:id="2ad19ae9-80dd-44b5-92f0-d7e1c9c0c28a" >
-			<ee:message >
+		<choice doc:name="Choice" doc:id="de340115-9052-4770-b9a2-17c362a6f925" >
+			<when expression="#[isEmpty(payload)]">
+				<ee:transform doc:name="email already registered" doc:id="de6c7e60-23c2-47a4-8205-690cc624fbcc">
+								<ee:message>
+									<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	msg : " email is already registered with us.",
+}]]></ee:set-payload>
+								</ee:message>
+							</ee:transform>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="prepare payload for DB" doc:id="2ad19ae9-80dd-44b5-92f0-d7e1c9c0c28a">
+			<ee:message>
 				<ee:set-payload resource="dwl/final-payload-for-user-table.dwl" />
 			</ee:message>
-			<ee:variables >
+			<ee:variables>
 			</ee:variables>
 		</ee:transform>
-		<try doc:name="Try" doc:id="27936209-e0d3-458a-9fe2-5376ffea4c43" >
+				<try doc:name="Try" doc:id="27936209-e0d3-458a-9fe2-5376ffea4c43">
 			<db:insert doc:name="Insert user record" doc:id="7bc47c43-e4a4-4827-9b7e-fb70276bd705" config-ref="MYSQL_Database_Config" target="insertQueryStatus">
 			<db:sql><![CDATA[#[
 %dw 2.0
@@ -172,11 +181,11 @@ readUrl("classpath://sql/query-to-insert-record-in-user-table.sql", "text/plain"
 	'hashID' : payload.hashID
 }]]]></db:input-parameters>
 		</db:insert>
-			<error-handler >
+					<error-handler>
 				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="c1dadb99-ba5f-40e5-8e42-c828c55e65b0" type="DB:BAD_SQL_SYNTAX, DB:CONNECTIVITY, DB:QUERY_EXECUTION, DB:RETRY_EXHAUSTED">
-					<ee:transform doc:name="Transform Message" doc:id="40d7dbd9-e76f-4b85-a49a-f5456fd35d26" >
-						<ee:message >
-							<ee:set-payload ><![CDATA[%dw 2.0
+					<ee:transform doc:name="Transform Message" doc:id="40d7dbd9-e76f-4b85-a49a-f5456fd35d26">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {
@@ -188,9 +197,9 @@ output application/json
 				</on-error-continue>
 			</error-handler>
 		</try>
-		<ee:transform doc:name="Transform Message" doc:id="6053c70b-8dd9-4a33-b69c-84ffd99ee34c" >
-			<ee:message >
-				<ee:set-payload ><![CDATA[%dw 2.0
+				<ee:transform doc:name="Transform Message" doc:id="6053c70b-8dd9-4a33-b69c-84ffd99ee34c">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 if(isEmpty(vars.insertQueryStatus)){
@@ -200,19 +209,11 @@ if(isEmpty(vars.insertQueryStatus)){
 	"msg" : "added successfully",
 	"primary key" : payload.hashID
 }
-/* 
-if(vars.insertQueryStatus.affectedRows > 0){
-	"msg" : "Record added successfully.",
-	"primary key" : payload.hashID
-}else if(!isEmpty(error)){
-	"msg" : "Something wrong happen.",
-	"error" : error
-}else{
-}
-* 
-*/]]></ee:set-payload>
+]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
+			</otherwise>
+		</choice>
 		<error-handler >
 			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="5d3c94c7-0451-4043-8346-959ba303f5b8" type="APP:*">
 				<ee:transform doc:name="Transform Message" doc:id="81ca5061-b10b-4666-8f1d-8e90aaa9aea1" >
@@ -236,7 +237,7 @@ error update{
 	</flow>
 	<flow name="users-DELETE-by-ID-Flow" doc:id="d84caaca-9783-46bb-9b1b-e53e19c3f15c" >
 		<http:listener doc:name="Listener" doc:id="7fa530f9-8cc3-45cc-8508-68d1a613609b" config-ref="HTTP_Listener_config" allowedMethods="DELETE" path="/users/{id}"/>
-		<set-payload value="#[attributes.uriParams.id]" doc:name="Set Payload" doc:id="f2924cce-998f-48b1-94c9-f6f54e700cc2" />
+		<set-payload value="#[attributes.uriParams.id]" doc:name="ID of the User" doc:id="f2924cce-998f-48b1-94c9-f6f54e700cc2" />
 		<db:delete doc:name="Delete single user by id" doc:id="792bfd76-c828-4bac-ae96-5b1104a07d36" config-ref="MYSQL_Database_Config" target="userDeleteStatus">
 			<db:sql ><![CDATA[#[
 %dw 2.0
@@ -271,7 +272,7 @@ payload]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
 	</flow>
-	<flow name="usersFlow" doc:id="472a9b6a-4a19-477e-ae00-da6b3be6dc48" >
+	<flow name="users-PUT-Flow" doc:id="472a9b6a-4a19-477e-ae00-da6b3be6dc48" >
 		<http:listener doc:name="Listener" doc:id="1b64676f-6d04-4463-80b1-f4bf3783da80" config-ref="HTTP_Listener_config" path="/users" allowedMethods="PUT"/>
 		<ee:transform doc:name="Transform Message" doc:id="6ea36bc8-0e73-49bc-8019-5ef933d02db3" >
 			<ee:message >

@@ -2,4 +2,4 @@
 import * from dw::core::Strings
 output application/json
 ---
-"UPDATE users SET " ++ substringBeforeLast(vars.prepareQueryParameters joinBy " ", ",") ++ " WHERE id = :id;"
+"UPDATE users SET " ++ substringBeforeLast(vars.prepareQueryParameters joinBy " ", ",") ++ " WHERE hashID = :id;"
