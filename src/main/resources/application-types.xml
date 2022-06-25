@@ -44,10 +44,12 @@ type input_meta_for_user_table = {|
     <types:processor-declaration>
       <types:input-event>
         <types:message>
-          <types:payload type="input-meta-for-user-table"/>
+          <types:payload type="create-user-record-input-meta"/>
         </types:message>
       </types:input-event>
     </types:processor-declaration>
   </types:enrichment>
   <types:enrichment select="#3403fb3f-3a6b-4bd3-8710-37a9e7384bdd"/>
+  <types:enrichment select="#2d902e14-45ad-448c-a6e9-7a5623199a15"/>
+  <types:enrichment select="#c4b21e26-9a83-4d4e-8c38-0af8126f3036"/>
 </types:mule>

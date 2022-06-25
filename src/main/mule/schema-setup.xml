@@ -7,7 +7,7 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
 http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
 http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
 	<flow name="create-user-table-flow" doc:id="16e4abbd-4c59-4b2b-9478-45f5fef96935" >
-		<http:listener doc:name="Listener" doc:id="d6f9a56b-8e06-43e7-915d-c9c4acced2cc" config-ref="HTTP_Listener_config" path="/setup"/>
+		<http:listener doc:name="Listener" doc:id="d6f9a56b-8e06-43e7-915d-c9c4acced2cc" config-ref="HTTP_Listener_config" path="/setup-user-table"/>
 		<try doc:name="Try" doc:id="f4b1a376-447a-4099-984a-2bc9adb247a0" >
 			<db:execute-ddl doc:name="Create Users table." doc:id="072c2838-5e05-4e84-a06f-33afd3376c86" config-ref="MYSQL_Database_Config">
 			<db:sql><![CDATA[#[
@@ -62,8 +62,66 @@ payload]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
 	</flow>
+	<flow name="schema-setupFlow" doc:id="e2865e27-ae03-44a4-93e3-d5d18ea9bf88" >
+		<http:listener doc:name="alter-user-table-flow" doc:id="07ca30be-693c-4b7e-b158-da7a8a509ba8" config-ref="HTTP_Listener_config" path="/alter-user-table"/>
+		<try doc:name="Try" doc:id="3204dac9-5fff-4cf8-9475-085ad56fb4d1" >
+			<db:execute-ddl doc:name="Alter user table" doc:id="6e5ec47f-5128-414d-b668-988bf917a343" config-ref="MYSQL_Database_Config">
+			<db:sql><![CDATA[#[
+%dw 2.0
+output text/plain
+---
+readUrl("classpath://sql/alter-user-table.sql", "text/plain")
+
+]]]></db:sql>
+		</db:execute-ddl>
+			<error-handler >
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="d9b7f451-2099-4392-a9ad-d15fbe120ac5" type="DB:CONNECTIVITY, DB:RETRY_EXHAUSTED">
+					<ee:transform doc:name="Transform Message" doc:id="45d3a4cd-074d-42b5-b26a-2afed009c64b" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	msg : "propogate error",
+	error : error,
+	payload : payload
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<logger level="INFO" doc:name="Logger" doc:id="f010389a-56dc-4201-ae07-d868e253ccb7" message="#[payload]"/>
+				</on-error-propagate>
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="3f52fcf7-b356-4373-ae80-ebd5a220aeb3" type="DB:BAD_SQL_SYNTAX, DB:QUERY_EXECUTION">
+					<ee:transform doc:name="Transform Message" doc:id="e54d2d76-c54b-48a9-9b56-7fcbf95774dc" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	msg : "continue error",
+	error : error,
+	payload : payload
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<logger level="INFO" doc:name="Logger" doc:id="bc42e66b-4d8f-4fab-8384-2747e71080af" message="#[payload]"/>
+				</on-error-continue>
+			</error-handler>
+		</try>
+		<ee:transform doc:name="Transform Message" doc:id="8b8a23d9-ca24-4953-9259-e551a69c0978" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+if(payload ~= 0){
+	"msg" : "User table altered successfully."
+}else{
+	"msg" : "Noting to altered."
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
 	<flow name="drop-user-table-flow" doc:id="7024b06f-6b3b-45f2-aff4-c7386f351d1e" >
-		<http:listener doc:name="Listener" doc:id="00734330-0f81-4a88-b12a-8bcb4d4014fe" config-ref="HTTP_Listener_config" path="/drop"/>
+		<http:listener doc:name="Listener" doc:id="00734330-0f81-4a88-b12a-8bcb4d4014fe" config-ref="HTTP_Listener_config" path="/drop-user-table"/>
 		<db:execute-ddl doc:name="Execute DDL" doc:id="e54d347a-dcdc-435b-9b95-8e463963ef0b" config-ref="MYSQL_Database_Config">
 			<db:sql ><![CDATA[#[
 %dw 2.0

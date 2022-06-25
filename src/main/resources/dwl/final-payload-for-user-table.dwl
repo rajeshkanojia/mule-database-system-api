@@ -8,7 +8,8 @@ output application/json
 	email : lower(payload.email) as String,
 	password : dw::Crypto::SHA1(payload.password as Binary),
 	date_of_birth : payload.date_of_birth as String {format: "y-MM-dd"},
-	date_of_joining : payload.date_of_joining as String {format: "y-MM-dd"},
-	account_status : payload.account_status default "inactive" as String,
-	email_verification_status : payload.email_verification_status default "unverified" as String	
+	date_of_joining : now() as String {format: "y-MM-dd"},
+	account_status : "inactive" as String,
+	email_verification_status : "unverified" as String,
+	hashID : dw::Crypto::SHA1(payload.email as Binary)
 }
