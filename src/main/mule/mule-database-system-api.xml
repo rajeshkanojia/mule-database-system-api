@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
-	xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties"
-	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd
 http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
-http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
 	<configuration-properties doc:name="Configuration properties" doc:id="6df260a2-11c5-4810-a30a-75cb18f0f761" file="general-config.yaml" doc:description="General config"/>
 	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="1c0bc7b7-7c08-4697-8af2-21e11424be1f" file="secure-config.yaml" key="user_module" doc:description="Secure Config">
 		<secure-properties:encrypt algorithm="Blowfish" />
@@ -18,6 +19,7 @@ http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/
 		<http:listener-connection host="${http.host}" port="${http.port}" />
 	</http:listener-config>
 	<configuration-properties doc:name="Configuration properties" doc:id="df63ee54-d804-46a4-864a-f3e85bfdd150" file="error-message.yaml" doc:description="Error message"/>
+	<os:object-store name="RegisteredUsersEmail" doc:name="Object store" doc:id="64a0fb79-54be-47eb-8c94-0bda08a98166" />
 	<flow name="mule-database-system-apiFlow" doc:id="50cb2a95-411a-4ecc-8a68-7c17a523915e" >
 		<http:listener doc:name="Listener" doc:id="132989f2-4aed-497f-a26b-6c134364bcc0" config-ref="HTTP_Listener_config" path="/test"/>
 		<db:select doc:name="Select" doc:id="c5b5429f-9fca-46ca-892b-c1301da636a8" config-ref="MYSQL_Database_Config">
@@ -31,5 +33,20 @@ output application/json
 payload]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
+	</flow>
+	<flow name="object-store-registeredUserEmails-add-detail" doc:id="5a3f2328-2b58-433d-b7fb-ed8292ff18cd" >
+		<os:store doc:name="Store" doc:id="dcf2fa2a-6884-444e-9166-e4e659bee101" key="#[payload.hash]" objectStore="RegisteredUsersEmail"/>
+		<logger level="INFO" doc:name="Logger" doc:id="cdd573aa-2e23-4be0-8349-40b2762cd1f5" message="#[payload]"/>
+	</flow>
+	<flow name="object-store-registeredUserEmails-remove-detail" doc:id="789d4f04-38fe-4699-bbde-a231d3a59523" >
+		<os:contains doc:name="Contains" doc:id="a7717639-26f6-4fc1-8a31-4fbf3ac59e21" key="#[payload]" objectStore="RegisteredUsersEmail" target="keyStatus"/>
+		<choice doc:name="Choice" doc:id="40e83713-d391-42fd-8993-b637e3a35d25" >
+			<when expression="#[vars.keyStatus]">
+				<os:remove doc:name="Remove" doc:id="ccc1b22d-59fa-4d76-b751-44d7bb1df23c" key="#[payload]" objectStore="RegisteredUsersEmail"/>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="52d4a94a-07c6-491a-8e7d-1176705ddd13" message="Don't have such key" />
+			</otherwise>
+		</choice>
 	</flow>
 </mule>

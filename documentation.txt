@@ -1,8 +1,7 @@
 Project name : Mulesoft Mysql Database System API
 Developer name : Rajesh Kumar Kanojia
 
-
-
+My first project as build a system api. I take user table with following schema and try to implement GET, POST, DELETE and PUT operation on the same table.
 
 
 Users table schema:- 
@@ -16,10 +15,29 @@ Users table schema:-
 	    password  VARCHAR(255) NOT NULL,
 	    account_status  ENUM('active', 'inactive', 'block', 'suspended'),
 	    email_verification_status  ENUM('verified', 'unverified'),
+	    hashID VARCHAR(255),
+	    hashKey VARCHAR(255),
 	    PRIMARY KEY ( id ),
 	    UNIQUE (email),
 	);
 
+Here is don't want to share/display my primary key(id) to end user so i created a new field with name hashID. As email field is unique index in my table so i simply hash this field with SHA1 and store the binary data in hashID field. This field will wark as primary key for user.
+
+For the GET operation 2 type of response format is available 
+	1 - JSON
+	2 - XML
+
+	to achive this functinality i user Dynamic Evaluation component. To get xml format output we need to pass format=xml in url, json is the default format.
+
+GET users:-
+	There are two ways to fetch/filter user record,
+	1- user by ID 	
+
+	2- all user or filter user based on first_name, last_name, email, hashID, account_status, email_verification_status
 
 
+Post users:-
 
+Delete user:-
+
+Put user:-

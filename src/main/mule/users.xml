@@ -78,14 +78,26 @@ if(payloadSize > 0){
 	</flow>
 	<flow name="users-GET-with-ID-Flow" doc:id="88b1f47a-c1c6-4a70-b4f5-ffbe542dce69" >
 		<http:listener doc:name="Listener" doc:id="562fa4e8-cf85-42e2-95e9-5d0e53487c66" config-ref="HTTP_Listener_config" path="/users/{id}" allowedMethods="GET"/>
-		<set-payload value="#[attributes.uriParams.id]" doc:name="Set Payload" doc:id="44f4c4f5-9cb1-4091-8bc9-6e975049e8b4" />
-		<db:select doc:name="Select" doc:id="30d4ee7b-94e8-49b1-8acd-59213819e4cf" config-ref="MYSQL_Database_Config">
-			<db:sql ><![CDATA[SELECT hashId as ID, first_name, last_name, email, account_status, email_verification_status FROM users WHERE hashID = :hashID]]></db:sql>
+		<set-payload value='#[attributes.uriParams.id as String]' doc:name="ID" doc:id="44f4c4f5-9cb1-4091-8bc9-6e975049e8b4" />
+		<set-variable value='#[attributes.queryParams.format default "json" as String]' doc:name="outputFormat" doc:id="ef835daa-75e9-4c97-ab50-44c2d9ece2f6" variableName="outputFormat"/>
+		<validation:is-not-blank-string doc:name="Is not blank string" doc:id="d4317787-e1d7-4603-9530-1d0388144f4f" config-ref="Validation_Config" message='#["ID should not be empty"]'/>
+		<db:select doc:name="Select User" doc:id="30d4ee7b-94e8-49b1-8acd-59213819e4cf" config-ref="MYSQL_Database_Config">
+			<db:sql ><![CDATA[SELECT 
+	hashId as ID, 
+	first_name as FirstName, 
+	last_name as LastName, 
+	email as UserEmail, 
+	account_status as AccountStatus, 
+	email_verification_status as EmailVerificationStatus 
+FROM 
+	users 
+WHERE hashID = :hashID
+]]></db:sql>
 			<db:input-parameters ><![CDATA[#[{
 	'hashID' : payload
 }]]]></db:input-parameters>
 		</db:select>
-		<ee:transform doc:name="Transform Message" doc:id="9feac8c5-66eb-490d-9a9a-87fb16e033e1">
+		<ee:transform doc:name="prepare result" doc:id="9feac8c5-66eb-490d-9a9a-87fb16e033e1">
 			<ee:message>
 				<ee:set-payload><![CDATA[%dw 2.0
 output application/json
@@ -94,15 +106,23 @@ var payloadSize = sizeOf(payload)
 if(payloadSize > 0){
 	success : true,
 	total_rows : payloadSize,
-	result : payload[0],
+	results : payload,
 }else{
 	success : false,
 	total_rows : 0,
-	result : {},
+	results : [],
 }
 ]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
+		<ee:transform doc:name="vars.responseFormat" doc:id="ad09f8d5-8f74-4c79-adbf-f0d6940da8ea" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable resource="output-format/response-format.dwl" variableName="responseFormat" />
+			</ee:variables>
+		</ee:transform>
+		<ee:dynamic-evaluate doc:name="Dynamic Evaluate" doc:id="5d06c52e-93a9-4dd4-83a4-24f5c119bc58" expression="#[vars.responseFormat]"/>
 	</flow>
 	<flow name="users-POST-Flow" doc:id="e58cb4dd-4eed-4501-9666-39d075825c53" >
 		<http:listener doc:name="Listener" doc:id="adc77639-e0b1-4310-a070-25c3192d5a8f" config-ref="HTTP_Listener_config" allowedMethods="POST" path="/users"/>
@@ -181,6 +201,22 @@ readUrl("classpath://sql/query-to-insert-record-in-user-table.sql", "text/plain"
 	'hashID' : payload.hashID
 }]]]></db:input-parameters>
 		</db:insert>
+					<async doc:name="Async-store-user-details-in-registeredUserEmail-Object-store" doc:id="0be40cbc-b629-4c4d-a2e0-b55078e21084" >
+						<ee:transform doc:name="Transform Message" doc:id="fa4a0bd5-4521-484e-b6a3-7f8f4953f3c6" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::Crypto
+output application/json
+---
+{
+	hash : dw::Crypto::SHA1(payload.email as Binary),
+	email : payload.email,
+	name : (payload.first_name as String) ++ (payload.last_name default "" as String)
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<flow-ref doc:name="Flow Reference" doc:id="59d68114-102d-4277-ba8b-7699dcd6ab01" name="object-store-registeredUserEmails-add-detail"/>
+					</async>
 					<error-handler>
 				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="c1dadb99-ba5f-40e5-8e42-c828c55e65b0" type="DB:BAD_SQL_SYNTAX, DB:CONNECTIVITY, DB:QUERY_EXECUTION, DB:RETRY_EXHAUSTED">
 					<ee:transform doc:name="Transform Message" doc:id="40d7dbd9-e76f-4b85-a49a-f5456fd35d26">
@@ -201,13 +237,14 @@ output application/json
 			<ee:message>
 				<ee:set-payload><![CDATA[%dw 2.0
 output application/json
+var payloadSize = if(isEmpty(vars.insertQueryStatus)) 0 else sizeOf(payload)
 ---
-if(isEmpty(vars.insertQueryStatus)){
-	"msg" : "duplicate",
-	error : error
+if(payloadSize > 0){
+	success : true,
+	results : {"primaryKey" : payload.hashID},
 }else{
-	"msg" : "added successfully",
-	"primary key" : payload.hashID
+	success : false,
+	results : {},
 }
 ]]></ee:set-payload>
 			</ee:message>
@@ -248,27 +285,30 @@ readUrl("classpath://sql/query-to-delete-single-user.sql", "text/plain")
 ]]]></db:sql>
 			<db:input-parameters ><![CDATA[#[{'id' : payload}]]]></db:input-parameters>
 		</db:delete>
+		<async doc:name="Async-remove-user-details-from-registeredUserEmail-Object-store" doc:id="a37ca471-0377-43ea-becc-f7a783f297b9" >
+			<ee:transform doc:name="Transform Message" doc:id="07be886a-b8f6-4b7f-b92c-a2bda8cf7009" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+attributes.uriParams.id]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Flow Reference" doc:id="89d8233d-0f72-4bfb-9d70-52e2ca6a0a93" name="object-store-registeredUserEmails-remove-detail"/>
+		</async>
 		<ee:transform doc:name="Transform Message" doc:id="52d5f3b7-365a-4d4b-af3f-c72cf7125874" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
 output application/json
 ---
-if(vars.userDeleteStatus ~= 1) {msg : "user deleted successfully"}else{msg: "we don't have any user with this id."}]]></ee:set-payload>
-			</ee:message>
-		</ee:transform>
-	</flow>
-	<flow name="users-DELETE-Conditional-Flow" doc:id="cfa5cdc9-04b3-410b-8154-4949ffb5a54e" >
-		<http:listener doc:name="Listener" doc:id="fbe73eaa-5ed1-44f0-a0d6-f4d3b14d38b9" config-ref="HTTP_Listener_config" allowedMethods="DELETE" path="/users"/>
-		<db:delete doc:name="Delete" doc:id="0708cf45-6040-44e4-97bc-d2e58a6336a3" config-ref="MYSQL_Database_Config">
-			<db:sql ><![CDATA[DELETE FROM users WHERE email = :email or id = :id]]></db:sql>
-			<db:input-parameters ><![CDATA[#[{'id' : 23, 'email' : 'rajes8@yopmail.com'}]]]></db:input-parameters>
-		</db:delete>
-		<ee:transform doc:name="Transform Message" doc:id="0b0d355d-9cce-469d-9ec3-79acba171465">
-			<ee:message>
-				<ee:set-payload><![CDATA[%dw 2.0
-output application/json
----
-payload]]></ee:set-payload>
+if(vars.userDeleteStatus ~= 1){
+	success : true,
+	results : {msg : "user deleted successfully"},
+}else{
+	success : false,
+	results : {msg: "we don't have any user with this id."},
+}
+]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
 	</flow>
@@ -325,109 +365,14 @@ payload]]></ee:set-payload>
 		<ee:transform doc:name="prepare update query" doc:id="84de1cc6-95a7-4814-84b2-e052f7dab6dd">
 			<ee:message>
 				<ee:set-payload><![CDATA[%dw 2.0
-import * from dw::core::Strings
 output application/json
 ---
-payload]]></ee:set-payload>
-			</ee:message>
-		</ee:transform>
-	</flow>
-	<flow name="Copy_of_users-POST-Flow" doc:id="da1b3805-5dee-4fe4-b14a-9472607f7225" >
-		<http:listener doc:name="Copy_of_Listener" doc:id="e8e616ed-e3ad-4779-9b81-e0be503c72bc" config-ref="HTTP_Listener_config" path="/users-backup" allowedMethods="POST" />
-		<ee:transform doc:name="Copy_of_Transform Message" doc:id="6efa4d0f-baee-492d-bcc2-9e953d6e9a32" >
-			<ee:message >
-				<ee:set-payload ><![CDATA[%dw 2.0
-output application/json
----
-payload]]></ee:set-payload>
-			</ee:message>
-		</ee:transform>
-		<choice doc:name="Copy_of_Choice" doc:id="e20a69ce-93bd-47ed-9185-012dbe0b21f8" >
-			<when expression="#[isBlank(payload.first_name)]" >
-				<raise-error doc:name="Copy_of_First name is Blank" doc:id="61c72687-f355-47f5-9a6a-2b18db97bcac" type="APP:FIELD_BLANK" description="#[p('errorMessages.FIELD_BLANK.FIRST_NAME')]" />
-			</when>
-			<when expression="#[isBlank(payload.email)]" >
-				<raise-error doc:name="Copy_of_Email is Blank" doc:id="775d8672-0703-4748-847b-67e2a793b237" type="APP:FIELD_BLANK" description="#[p('errorMessages.FIELD_BLANK.EMAIL')]" />
-			</when>
-			<when expression="#[isBlank(payload.date_of_birth)]" >
-				<raise-error doc:name="Copy_of_DOB is Blank" doc:id="04365f72-bdd1-44a1-9cc4-0414dd072622" type="APP:FIELD_BLANK" description="#[p('errorMessages.FIELD_BLANK.DOB')]" />
-			</when>
-			<when expression="#[isBlank(payload.password)]" >
-				<raise-error doc:name="Copy_of_Password is Blank" doc:id="363464c5-d321-4f94-968c-cc0458292615" type="APP:FIELD_BLANK" description="#[p('errorMessages.FIELD_BLANK.PASSWORD')]" />
-			</when>
-			<otherwise >
-				<ee:transform doc:name="Copy_of_Add extra fields" doc:id="231ae2ee-e1e4-44ae-a6a8-7d28b437ac9d" >
-					<ee:message >
-						<ee:set-payload resource="dwl/add-other-mandatory-fields-for-user-table.dwl" />
-					</ee:message>
-				</ee:transform>
-			</otherwise>
-		</choice>
-		<ee:transform doc:name="Copy_of_prepare payload for DB" doc:id="38674642-8d74-4a28-bfad-e837702b5d0e" >
-			<ee:message >
-				<ee:set-payload resource="dwl/final-payload-for-user-table.dwl" />
-			</ee:message>
-		</ee:transform>
-		<db:insert doc:name="Copy_of_Insert record in User table" doc:id="54ba5cc8-ba5d-4a2f-a2ce-7484722af746" config-ref="MYSQL_Database_Config" autoGenerateKeys="true" >
-			<db:sql ><![CDATA[#[
-%dw 2.0
-output text/plain
----
-readUrl("classpath://sql/query-to-insert-record-in-user-table.sql", "text/plain")
-]]]></db:sql>
-			<db:input-parameters ><![CDATA[#[{
-	'first_name' : payload.first_name, 
-	'last_name' : payload.last_name, 
-	'email' : payload.email, 
-	'password' : payload.password, 
-	'date_of_birth' : payload.date_of_birth, 
-	'date_of_joining' : payload.date_of_joining, 
-	'account_status' : payload.account_status,	
-	'email_verification_status' : payload.email_verification_status
-}]]]></db:input-parameters>
-			<db:auto-generated-keys-column-names >
-				<db:auto-generated-keys-column-name value="id" />
-				<db:auto-generated-keys-column-name value="name" />
-			</db:auto-generated-keys-column-names>
-		</db:insert>
-		<ee:transform doc:name="Copy_of_Transform Message" doc:id="9d7739ba-0bec-4415-bf5d-c4270358c695" >
-			<ee:message >
-				<ee:set-payload ><![CDATA[%dw 2.0
-output application/json
----
-payload]]></ee:set-payload>
-			</ee:message>
-		</ee:transform>
-		<error-handler >
-			<on-error-propagate enableNotifications="true" logException="true" doc:name="Copy_of_On Error Propagate" doc:id="7a88599d-1caf-47ad-9a6d-75e4f7369729" type="APP:*" >
-				<ee:transform doc:name="Copy_of_Transform Message" doc:id="80eb6c75-6186-442e-9bb9-570e9127dc9a" >
-					<ee:message >
-						<ee:set-payload ><![CDATA[%dw 2.0
-output application/json
----
-"[" ++ now() ++ "] - " ++ error.errorType.namespace as String ++ ":" ++ error.errorType.identifier as String ++ " - " ++ error.description as String
-/* 
-error update{
-    	case description at .description if(isBlank(error.description)) -> "description"
-}
-* 
-*/
-]]></ee:set-payload>
-					</ee:message>
-				</ee:transform>
-				<logger level="INFO" doc:name="Copy_of_Logger" doc:id="608789a9-04b6-41af-9c1e-d3ccb567c783" message="#[payload]" />
-			</on-error-propagate>
-		</error-handler>
-	</flow>
-	<flow name="usersFlow1" doc:id="16042e78-0031-4fa9-9e3d-80d4b3b24177" >
-		<http:listener doc:name="Listener" doc:id="53198405-45ec-49af-96c3-f6941fe276b0" config-ref="HTTP_Listener_config" path="/remove-format"/>
-		<ee:transform doc:name="Transform Message" doc:id="b8e5b5d9-2c24-4e0b-8cfe-385c7cb23e88" >
-			<ee:message >
-				<ee:set-payload ><![CDATA[%dw 2.0
-output application/json
----
-attributes.queryParams update{
-	case format at .format if(!isEmpty(format)) -> attributes.queryParams -- {"newObject" : attributes.queryParams.format}
+if(payload.affectedRows > 0){
+	success : true,
+	results : {msg : "record updated successfully."},
+}else{
+	success : false,
+	results : {msg: "We don't have any record with this ID."},
 }
 ]]></ee:set-payload>
 			</ee:message>

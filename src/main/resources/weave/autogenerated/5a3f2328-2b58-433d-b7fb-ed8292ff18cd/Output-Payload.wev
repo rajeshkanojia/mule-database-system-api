@@ -1,0 +1,7 @@
+%dw 2.0
+
+type auto_5a3f2328_2b58_433d_b7fb_ed8292ff18cd_Output_Payload = {|
+  email: String, 
+  name: String
+|}
+
